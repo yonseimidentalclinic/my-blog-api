@@ -60,7 +60,7 @@ async function setupDatabaseAndStartServer() {
     `;
     await pool.query(createTablesQuery);
 
-    app.get('/', (req, res) => { res.send('나의 첫 배포될 API 서버!'); });
+    app.get('/', (req, res) => { res.send('API 서버 v2 - 최종 버전이 배포되었습니다!'); });
 
     // 이미지 업로드 전용 API
     app.post('/api/upload', upload.single('image'), (req, res) => {

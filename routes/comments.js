@@ -1,33 +1,32 @@
 // routes/comments.js
 const express = require('express');
-const router = express.Router({ mergeParams: true }); // [수정] mergeParams: true 옵션 추가
+const router = express.Router({ mergeParams: true });
 const authMiddleware = require('../authMiddleware');
 
 module.exports = (pool) => {
-    // 특정 게시글의 모든 댓글 조회 (경로: /) - 누구나 가능
+    // 특정 게시글의 모든 댓글 조회
     router.get('/', async (req, res) => {
-        const { postId } = req.params; // 주소에서 postId를 가져옴
-         try {
+        const { postId } = req.params;
+        try {
             const result = await pool.query(
-                'SELECT * FROM comments WHERE "postId" = $1 ORDER BY "createdAt" ASC',
+                'SELECT c.*, u.username FROM comments c JOIN users u ON c."userId" = u.id WHERE c."postId" = $1 ORDER BY c."createdAt" ASC',
                 [postId]
             );
             res.json(result.rows);
         } catch (error) {
+            console.error('Get Comments Error:', error);
             res.status(500).json({ error: error.message });
         }
     });
 
-    // 특정 게시글에 새 댓글 작성 (경로: /) - 로그인한 사용자만 가능
+    // 특정 게시글에 새 댓글 작성
     router.post('/', authMiddleware, async (req, res) => {
         const { postId } = req.params;
         const { content } = req.body;
-        const userId = req.user.id; // 인증된 사용자의 id
-
+        const userId = req.user.id;
         if (!content) {
             return res.status(400).json({ message: '댓글 내용은 필수입니다.' });
         }
-
         try {
             const result = await pool.query(
                 'INSERT INTO comments (content, "userId", "postId") VALUES ($1, $2, $3) RETURNING *',
@@ -35,9 +34,10 @@ module.exports = (pool) => {
             );
             res.status(201).json(result.rows[0]);
         } catch (error) {
+            console.error('Create Comment Error:', error);
             res.status(500).json({ error: error.message });
         }
-    }); 
+    });
 
     return router;
 };

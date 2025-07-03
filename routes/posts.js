@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../authMiddleware');
 
-module.exports = (Pool) => {
+module.exports = (pool) => {
     // 모든 게시글 조회 (누구나)
     router.get('/', async (req, res) => {
         try {
@@ -27,7 +27,7 @@ module.exports = (Pool) => {
         
         try {
             const result = await pool.query(
-                'INSERT INTO posts (title, content, userId, imageUrl) VALUES (?, ?, ?, ?)',
+                'INSERT INTO posts (title, content, "userId", "imageUrl") VALUES ($, $, $, $)',
                 [title, content, userId, imageUrl]
             );
            res.status(201).json(result.rows[0]);

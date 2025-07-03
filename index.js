@@ -39,33 +39,30 @@ const upload = multer({ storage: storage });
 // 데이터베이스 연결 설정을 위한 비동기 함수
 async function setupDatabaseAndStartServer() {
 
-     const createTablesQuery = `
-    // 1. users 테이블 먼저 생성
-    
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY,
-             username VARCHAR(255) NOT NULL UNIQUE,
-            password VARCHAR(255) NOT NULL,
-            "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        CREATE TABLE IF NOT EXISTS posts (
-            id SERIAL PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            content TEXT NOT NULL,
-            "imageUrl" VARCHAR(255),
-            "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            "userId" INTEGER REFERENCES users(id)
-        );
-
-         CREATE TABLE IF NOT EXISTS comments (
-            id SERIAL PRIMARY KEY,
-            content TEXT NOT NULL,
-            "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            "userId" INTEGER REFERENCES users(id),
-            "postId" INTEGER REFERENCES posts(id)
-        );
-    `;
+// 테이블 생성 SQL (PostgreSQL 문법으로 일부 수정)
+const createTablesQuery = `
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS posts (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        "imageUrl" VARCHAR(255),
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "userId" INTEGER REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS comments (
+        id SERIAL PRIMARY KEY,
+        content TEXT NOT NULL,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "userId" INTEGER REFERENCES users(id),
+        "postId" INTEGER REFERENCES posts(id)
+    );
+`;
 
     
     await pool.query(createTablesQuery);
@@ -96,13 +93,12 @@ async function setupDatabaseAndStartServer() {
     });
 
     // 라우터 연결
-    const postsRouter = require('./routes/posts')(db);
+    const postsRouter = require('./routes/posts')(pool);
     app.use('/api/posts', postsRouter);
 
-    const usersRouter = require('./routes/users')(db);
-    app.use('/api/users', usersRouter);
+    const usersRouter = require('./routes/users')(pool);
 
-    const commentsRouter = commentsRouterFn(db);
+    const commentsRouter = commentsRouterFn(pool);
     // '/api/posts/:postId/comments' 경로로 들어오는 요청을 commentsRouter에게 넘겨줍니다.
     app.use('/api/posts/:postId/comments', commentsRouter);
 

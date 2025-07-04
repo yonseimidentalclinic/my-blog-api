@@ -20,11 +20,14 @@ const pool = new Pool({
   }
 });
 
-// CORS 설정: Vercel 프론트엔드 주소를 명시적으로 허용
+// [최종 수정] CORS 설정을 더 명시적으로 변경
 const corsOptions = {
- origin: process.env.CORS_ORIGIN, 
-  optionsSuccessStatus: 200
+  origin: process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app',
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
+  optionsSuccessStatus: 204
 };
+
 app.use(cors(corsOptions));
  
 

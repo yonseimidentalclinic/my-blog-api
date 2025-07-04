@@ -10,6 +10,11 @@ const JWT_SECRET = process.env.JWT_SECRET;
 module.exports = (pool) => {
     // 회원가입 API (authMiddleware가 없습니다)
     router.post('/register', async (req, res) => {
+
+        // ▼▼▼ 새로운 진단용 코드 추가 ▼▼▼
+        console.log('>>> /register 최신 라우트 코드가 실행되었습니다! 인증 미들웨어 없음!');
+        // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
         const { username, password } = req.body;
         if (!username || !password) {
             return res.status(400).json({ message: '아이디와 비밀번호는 필수입니다.' });

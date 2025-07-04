@@ -1,4 +1,5 @@
 // routes/users.js
+// routes/users.js (최종 완성 버전)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -7,7 +8,7 @@ const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
 module.exports = (pool) => {
-    // 회원가입 API
+    // 회원가입 API (authMiddleware가 없습니다)
     router.post('/register', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) {
@@ -33,7 +34,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 로그인 API
+    // 로그인 API (authMiddleware가 없습니다)
     router.post('/login', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) {

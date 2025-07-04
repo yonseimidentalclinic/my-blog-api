@@ -9,11 +9,6 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// [수정] CORS 설정에 Vercel 프론트엔드 주소 추가
-const corsOptions = {
-  origin: 'https://my-blog-frontend-one.vercel.app',
-  optionsSuccessStatus: 200 
-};
 
 
 // DB Connection Pool 생성
@@ -25,7 +20,14 @@ const pool = new Pool({
   }
 });
 
-app.use(cors());
+// CORS 설정: Vercel 프론트엔드 주소를 명시적으로 허용
+const corsOptions = {
+  origin: 'https://my-blog-frontend-one.vercel.app',
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
+
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 

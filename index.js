@@ -22,11 +22,11 @@ const pool = new Pool({
 
 // CORS 설정: Vercel 프론트엔드 주소를 명시적으로 허용
 const corsOptions = {
-  origin: 'https://my-blog-frontend-one.vercel.app',
+ origin: process.env.CORS_ORIGIN, 
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
-
+ 
 
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));

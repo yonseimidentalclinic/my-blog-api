@@ -61,6 +61,12 @@ async function setupDatabaseAndStartServer() {
     await pool.query(createTablesQuery);
 
     app.get('/', (req, res) => { res.send('API 서버 v2 - 최종 버전이 배포되었습니다!'); });
+   
+     // ▼▼▼ 새로운 진단용 API 추가 ▼▼▼
+    app.get('/test-deploy', (req, res) => {
+        res.send('SUCCESS! The latest version is deployed.');
+    });
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     // 이미지 업로드 전용 API
     app.post('/api/upload', upload.single('image'), (req, res) => {

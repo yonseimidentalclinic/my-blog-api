@@ -2,7 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../authMiddleware'); // 인증 미들웨어
+// [수정] authMiddleware 경로를 현재 파일 위치 기준으로 ../authMiddleware 로 명확히 합니다.
+const authMiddleware = require('../authMiddleware');
 
 module.exports = (pool) => {
 
@@ -50,7 +51,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 참고: 댓글 수정 및 삭제 API도 여기에 추가할 수 있습니다.
-
     return router;
 };
+
+

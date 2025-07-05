@@ -44,6 +44,11 @@ const initializeDatabase = async () => {
             );
         `);
         // comments 테이블
+
+       // [핵심 수정] 기존 comments 테이블을 삭제하여 재생성을 유도합니다.
+        await client.query('DROP TABLE IF EXISTS comments;');
+
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS comments (
                 id SERIAL PRIMARY KEY,

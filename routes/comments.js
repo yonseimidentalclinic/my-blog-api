@@ -69,7 +69,38 @@ module.exports = (pool) => {
         }
     });
 
+    // [추가] 3. 댓글 삭제 API (인증 필요)
+    router.delete('/:id', authMiddleware, async (req, res) => {
+        const { id } = req.params; // URL에서 댓글 ID를 받습니다.
+        const currentUserId = req.user.id;
+
+        try {
+            // 1. 댓글 작성자 확인
+            const commentResult = await pool.query('SELECT "userId" FROM comments WHERE id = $1', [id]);
+            if (commentResult.rows.length === 0) {
+                return res.status(404).json({ message: '댓글을 찾을 수 없습니다.' });
+            }
+
+            const comment = commentResult.rows[0];
+            if (comment.userId !== currentUserId) {
+                return res.status(403).json({ message: '이 댓글을 삭제할 권한이 없습니다.' });
+            }
+
+            // 2. 댓글 삭제 실행
+            await pool.query('DELETE FROM comments WHERE id = $1', [id]);
+            res.status(200).json({ message: '댓글이 성공적으로 삭제되었습니다.' });
+
+        } catch (error) {
+            console.error('댓글 삭제 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.', error: error.message });
+        }
+    });
+
+
     return router;
 };
+
+
+    
 
 

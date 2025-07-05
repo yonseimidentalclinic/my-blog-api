@@ -27,6 +27,13 @@ const initializeDatabase = async () => {
                 password VARCHAR(255) NOT NULL
             );
         `);
+
+         // [핵심 수정] 기존 posts 및 comments 테이블을 삭제하여 재생성을 유도합니다.
+        // CASCADE 옵션은 posts를 참조하는 comments도 함께 삭제합니다.
+        await client.query('DROP TABLE IF EXISTS posts CASCADE;');
+        await client.query('DROP TABLE IF EXISTS comments;');
+
+
         await client.query(`
             CREATE TABLE IF NOT EXISTS posts (
                 id SERIAL PRIMARY KEY,

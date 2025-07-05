@@ -105,11 +105,11 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
 // [정리] 라우터에 DB connection pool 전달
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
-// const commentsRoutes = require('./routes/comments'); // 곧 만들 파일
+const commentsRoutes = require('./routes/comments'); 
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
-// app.use('/api/comments', commentsRoutes(pool)); // comments.js 파일 생성 후 주석 해제
+app.use('/api/comments', commentsRoutes(pool)); 
 
 /*
 // [참고] 아래 라우트들은 각 파일이 준비되면 주석을 해제하여 사용하세요.

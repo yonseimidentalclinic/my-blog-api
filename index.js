@@ -161,6 +161,14 @@ app.get('/api/posts', async (req, res) => {
         res.status(200).json({ posts: postsResult.rows, totalPages: Math.ceil(totalPosts / limit), currentPage: page, totalPosts: totalPosts });
     } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
 });
+app.get('/api/posts/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
+        res.status(200).json(result.rows[0]);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
 app.post('/api/posts', authMiddleware, async (req, res) => {
     const { title, content, imageUrl } = req.body;
     try {

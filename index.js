@@ -15,9 +15,11 @@ const pool = new Pool({
   }
 });
 
+// [핵심 수정] 데이터베이스 스키마를 확인하고, 없으면 안전하게 추가하는 함수
 const initializeDatabase = async () => {
     const client = await pool.connect();
     try {
+        // users 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -25,12 +27,8 @@ const initializeDatabase = async () => {
                 password VARCHAR(255) NOT NULL
             );
         `);
-
-        // [핵심 수정] 기존 posts 및 연관된 테이블을 삭제하여 재생성을 유도합니다.
-        await client.query('DROP TABLE IF EXISTS posts CASCADE;');
-        await client.query('DROP TABLE IF EXISTS comments;');
-        await client.query('DROP TABLE IF EXISTS likes;');
-
+        
+        // posts 테이블 생성 (likeCount가 없어도 일단 생성)
         await client.query(`
             CREATE TABLE IF NOT EXISTS posts (
                 id SERIAL PRIMARY KEY,
@@ -40,9 +38,21 @@ const initializeDatabase = async () => {
                 "userId" INTEGER NOT NULL,
                 "authorUsername" VARCHAR(255) NOT NULL,
                 "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                "likeCount" INTEGER DEFAULT 0
+                FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE
             );
         `);
+
+        // 'posts' 테이블에 'likeCount' 컬럼이 있는지 확인하고 없으면 추가
+        const checkColumnRes = await client.query(`
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'posts' AND column_name = 'likeCount'
+        `);
+        if (checkColumnRes.rows.length === 0) {
+            console.log(">>> 'posts' 테이블에 'likeCount' 컬럼을 추가합니다.");
+            await client.query('ALTER TABLE posts ADD COLUMN "likeCount" INTEGER DEFAULT 0');
+        }
+
+        // comments 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS comments (
                 id SERIAL PRIMARY KEY,
@@ -55,6 +65,8 @@ const initializeDatabase = async () => {
                 FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE
             );
         `);
+
+        // likes 테이블 생성
         await client.query(`
             CREATE TABLE IF NOT EXISTS likes (
                 "userId" INTEGER NOT NULL,
@@ -64,13 +76,15 @@ const initializeDatabase = async () => {
                 FOREIGN KEY ("postId") REFERENCES posts (id) ON DELETE CASCADE
             );
         `);
-        console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 재생성되었습니다.');
+        
+        console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 확인 및 수정되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
     } finally {
         client.release();
     }
 };
+
 
 initializeDatabase().catch(err => console.error('초기화 프로세스 에러:', err));
 

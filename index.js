@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
-const multer = require('multer');
 const path = require('path');
 const authMiddleware = require('./authMiddleware');
 
@@ -95,28 +94,14 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'uploads/');
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${Date.now()}-${file.originalname}`);
-    }
-});
-const upload = multer({ storage });
 
-app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ message: '이미지 파일이 필요합니다.' });
-    }
-    res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` });
-});
 
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
 const commentsRoutes = require('./routes/comments');
 const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
+const uploadRoutes = require('./routes/upload'); 
 
 
 app.use('/api/users', usersRoutes(pool));
@@ -125,6 +110,7 @@ app.use('/api/comments', commentsRoutes(pool));
 // index.js 파일 하단의 다른 app.use들과 함께 추가
 app.use('/api/search', searchRoutes(pool));
 app.use('/api/likes', likesRoutes(pool));
+app.use('/api/upload', uploadRoutes(pool)); // 업로드 라우트 추가
 
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);

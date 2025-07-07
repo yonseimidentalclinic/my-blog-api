@@ -1,4 +1,4 @@
-// index.js (리팩토링 후)
+// index.js (리팩토링 수정 버전)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -36,17 +36,10 @@ const initializeDatabase = async () => {
                 "userId" INTEGER NOT NULL,
                 "authorUsername" VARCHAR(255) NOT NULL,
                 "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                "likeCount" INTEGER DEFAULT 0,
                 FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE
             );
         `);
-        const checkColumnRes = await client.query(`
-            SELECT 1 FROM information_schema.columns 
-            WHERE table_name = 'posts' AND column_name = 'likeCount'
-        `);
-        if (checkColumnRes.rows.length === 0) {
-            console.log(">>> 'posts' 테이블에 'likeCount' 컬럼을 추가합니다.");
-            await client.query('ALTER TABLE posts ADD COLUMN "likeCount" INTEGER DEFAULT 0');
-        }
         await client.query(`
             CREATE TABLE IF NOT EXISTS comments (
                 id SERIAL PRIMARY KEY,
@@ -72,20 +65,21 @@ const initializeDatabase = async () => {
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };
 initializeDatabase().catch(err => console.error('초기화 프로세스 에러:', err));
 
 // --- 미들웨어 설정 ---
 const corsOptions = {
+  // [수정] methods를 문자열 배열로 변경하여 안정성을 높입니다.
   origin: [process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app', 'http://localhost:5173', 'http://127.0.0.1:5173'],
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
   optionsSuccessStatus: 204
 };
+// [수정] app.use(cors(corsOptions))가 pre-flight 요청을 처리하므로 app.options는 보통 필요 없습니다.
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -97,10 +91,11 @@ const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
 
+// [수정] searchRoutes도 데이터베이스(pool)를 사용하므로 pool을 전달해야 합니다.
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
 app.use('/api/comments', commentsRoutes(pool));
-app.use('/api/search', searchRoutes);
+app.use('/api/search', searchRoutes(pool)); // <--- 여기가 수정된 부분입니다.
 app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
 
@@ -108,3 +103,4 @@ app.use('/api/upload', uploadRoutes);
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);
 });
+

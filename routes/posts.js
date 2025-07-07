@@ -2,12 +2,25 @@
 
 const express = require('express');
 const router = express.Router();
-// [수정] authMiddleware 경로를 현재 파일 위치 기준으로 ../authMiddleware 로 명확히 합니다.
 const authMiddleware = require('../authMiddleware');
 
 module.exports = (pool) => {
 
-    // 1. 모든 게시글 조회 API (페이지네이션 적용)
+    // [추가] 1. 인기 게시글 조회 API (좋아요 순)
+    router.get('/popular', async (req, res) => {
+        try {
+            // 좋아요 개수가 많은 순서대로 상위 5개만 조회
+            const result = await pool.query(
+                'SELECT * FROM posts WHERE "likeCount" > 0 ORDER BY "likeCount" DESC, "createdAt" DESC LIMIT 5'
+            );
+            res.status(200).json(result.rows);
+        } catch (error) {
+            console.error('인기 게시글 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
+    // 2. 모든 게시글 조회 API (페이지네이션 적용)
     router.get('/', async (req, res) => {
         const page = parseInt(req.query.page || '1', 10);
         const limit = parseInt(req.query.limit || '5', 10);
@@ -38,7 +51,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 2. 특정 게시글 조회 API
+    // 3. 특정 게시글 조회 API
     router.get('/:id', async (req, res) => {
         const { id } = req.params;
         try {
@@ -53,7 +66,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 3. 새 게시글 작성 API
+    // 4. 새 게시글 작성 API
     router.post('/', authMiddleware, async (req, res) => {
         const { title, content, imageUrl } = req.body;
         const userId = req.user.id;
@@ -75,7 +88,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 4. 게시글 수정 API
+    // 5. 게시글 수정 API
     router.put('/:id', authMiddleware, async (req, res) => {
         const { id } = req.params;
         const { title, content } = req.body;
@@ -107,7 +120,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 5. 게시글 삭제 API
+    // 6. 게시글 삭제 API
     router.delete('/:id', authMiddleware, async (req, res) => {
         const { id } = req.params;
         const currentUserId = req.user.id;
@@ -131,7 +144,7 @@ module.exports = (pool) => {
         }
     });
 
-    // 6. 좋아요/좋아요 취소 API
+    // 7. 좋아요/좋아요 취소 API
     router.post('/:id/like', authMiddleware, async (req, res) => {
         const postId = parseInt(req.params.id, 10);
         if (isNaN(postId)) {
@@ -171,7 +184,7 @@ module.exports = (pool) => {
         }
     });
 
-    // [추가] 7. 특정 게시글에 '좋아요' 누른 사용자 목록 조회 API
+    // 8. 특정 게시글에 '좋아요' 누른 사용자 목록 조회 API
     router.get('/:postId/likers', async (req, res) => {
         const { postId } = req.params;
         try {
@@ -187,9 +200,6 @@ module.exports = (pool) => {
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
         }
     });
-
-
-
 
     return router;
 };

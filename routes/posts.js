@@ -130,8 +130,9 @@ module.exports = (pool) => {
         }
     });
 
-    // 6. 좋아요/좋아요 취소 API (인증 필요)
+    // [핵심 수정] 6. 좋아요/좋아요 취소 API
     router.post('/:id/like', authMiddleware, async (req, res) => {
+        // [수정] ID를 안전하게 숫자로 변환합니다.
         const postId = parseInt(req.params.id, 10);
         if (isNaN(postId)) {
             return res.status(400).json({ message: '유효하지 않은 게시글 ID입니다.' });
@@ -146,13 +147,11 @@ module.exports = (pool) => {
 
             if (likeResult.rows.length > 0) {
                 await client.query('DELETE FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
-                // [수정] COALESCE 함수를 사용하여 NULL 값 문제를 방지합니다.
                 await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) - 1 WHERE id = $1', [postId]);
                 await client.query('COMMIT');
                 res.status(200).json({ message: '좋아요를 취소했습니다.' });
             } else {
                 await client.query('INSERT INTO likes ("userId", "postId") VALUES ($1, $2)', [userId, postId]);
-                // [수정] COALESCE 함수를 사용하여 NULL 값 문제를 방지합니다.
                 await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) + 1 WHERE id = $1', [postId]);
                 await client.query('COMMIT');
                 res.status(200).json({ message: '좋아요를 눌렀습니다.' });

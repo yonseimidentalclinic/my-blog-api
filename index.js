@@ -42,6 +42,7 @@ const initializeDatabase = async () => {
                 "userId" INTEGER NOT NULL,
                 "authorUsername" VARCHAR(255) NOT NULL,
                 "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                "likeCount" INTEGER DEFAULT 0, -- [추가] 좋아요 개수 컬럼
                 FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE
             );
         `);
@@ -60,6 +61,19 @@ const initializeDatabase = async () => {
                 FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE
             );
         `);
+    
+             // [추가] 좋아요 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS likes (
+                "userId" INTEGER NOT NULL,
+                "postId" INTEGER NOT NULL,
+                PRIMARY KEY ("userId", "postId"), -- 한 사용자는 한 게시글에 한 번만 좋아요 가능
+                FOREIGN KEY ("userId") REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY ("postId") REFERENCES posts (id) ON DELETE CASCADE
+            );
+        `);
+
+
         console.log('PostgreSQL 데이터베이스가 성공적으로 연결 및 초기화되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);

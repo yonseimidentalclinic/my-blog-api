@@ -6,8 +6,8 @@ const { Pool } = require('pg');
 const multer = require('multer');
 const path = require('path');
 const authMiddleware = require('./authMiddleware');
-// index.js 파일 상단에 다른 require문들과 함께 추가
-const searchRoutes = require('./routes/search');
+
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -115,12 +115,16 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
 const commentsRoutes = require('./routes/comments');
+const searchRoutes = require('./routes/search');
+const likesRoutes = require('./routes/likes');
+
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
 app.use('/api/comments', commentsRoutes(pool));
 // index.js 파일 하단의 다른 app.use들과 함께 추가
 app.use('/api/search', searchRoutes(pool));
+app.use('/api/likes', likesRoutes(pool));
 
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);

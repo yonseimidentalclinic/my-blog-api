@@ -1,15 +1,35 @@
 // routes/posts.js
-
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../authMiddleware');
+// 사용자님의 기존 미들웨어 이름을 사용합니다.
+const authMiddleware = require('../authMiddleware'); 
 
 module.exports = (pool) => {
 
-    // [추가] 1. 인기 게시글 조회 API (좋아요 순)
+    // [태그 기능] 특정 태그에 해당하는 게시글 목록 조회 API
+    router.get('/tagged/:tagName', async (req, res) => {
+        const { tagName } = req.params;
+        try {
+            const result = await pool.query(
+                `SELECT p.*, u.username as "authorUsername" 
+                 FROM posts p
+                 JOIN users u ON p."userId" = u.id
+                 JOIN post_tags pt ON p.id = pt."postId"
+                 JOIN tags t ON pt."tagId" = t.id
+                 WHERE t.name = $1
+                 ORDER BY p."createdAt" DESC`,
+                [tagName.toLowerCase()]
+            );
+            res.status(200).json(result.rows);
+        } catch (error) {
+            console.error('태그별 게시글 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
+    // 1. 인기 게시글 조회 API (좋아요 순)
     router.get('/popular', async (req, res) => {
         try {
-            // 좋아요 개수가 많은 순서대로 상위 5개만 조회
             const result = await pool.query(
                 'SELECT * FROM posts WHERE "likeCount" > 0 ORDER BY "likeCount" DESC, "createdAt" DESC LIMIT 5'
             );
@@ -28,7 +48,7 @@ module.exports = (pool) => {
 
         try {
             const postsResultPromise = pool.query(
-                'SELECT * FROM posts ORDER BY "createdAt" DESC LIMIT $1 OFFSET $2',
+                'SELECT p.*, u.username as "authorUsername" FROM posts p JOIN users u ON p."userId" = u.id ORDER BY p."createdAt" DESC LIMIT $1 OFFSET $2',
                 [limit, offset]
             );
             const totalResultPromise = pool.query('SELECT COUNT(*) FROM posts');
@@ -51,24 +71,44 @@ module.exports = (pool) => {
         }
     });
 
-    // 3. 특정 게시글 조회 API
+    // 3. 특정 게시글 조회 API ([태그 기능] 태그 정보 포함)
     router.get('/:id', async (req, res) => {
         const { id } = req.params;
+        const client = await pool.connect();
         try {
-            const result = await pool.query('SELECT * FROM posts WHERE id = $1', [id]);
-            if (result.rows.length === 0) {
+            await client.query('BEGIN');
+            const postResult = await client.query('SELECT p.*, u.username as "authorUsername" FROM posts p JOIN users u ON p."userId" = u.id WHERE p.id = $1', [id]);
+            if (postResult.rows.length === 0) {
                 return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
             }
-            res.status(200).json(result.rows[0]);
+            const post = postResult.rows[0];
+
+            // [태그 기능] 게시글에 연결된 태그들을 조회합니다.
+            const tagsResult = await client.query(
+                `SELECT t.name FROM tags t
+                 JOIN post_tags pt ON t.id = pt."tagId"
+                 WHERE pt."postId" = $1`,
+                [id]
+            );
+            // post 객체에 tags 배열을 추가합니다.
+            post.tags = tagsResult.rows.map(row => row.name);
+
+            await client.query('COMMIT');
+            res.status(200).json(post);
+
         } catch (error) {
+            await client.query('ROLLBACK');
             console.error('특정 게시글 조회 에러:', error);
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        } finally {
+            client.release();
         }
     });
 
-    // 4. 새 게시글 작성 API
+    // 4. 새 게시글 작성 API ([태그 기능] 태그 처리 로직 추가)
     router.post('/', authMiddleware, async (req, res) => {
-        const { title, content, imageUrl } = req.body;
+        // [태그 기능] tags를 req.body에서 받아옵니다.
+        const { title, content, imageUrl, tags } = req.body;
         const userId = req.user.id;
         const authorUsername = req.user.username;
 
@@ -76,47 +116,112 @@ module.exports = (pool) => {
             return res.status(400).json({ message: '제목과 내용은 필수입니다.' });
         }
 
+        const client = await pool.connect();
         try {
-            const result = await pool.query(
+            await client.query('BEGIN');
+
+            const postResult = await client.query(
                 'INSERT INTO posts (title, content, "imageUrl", "userId", "authorUsername") VALUES ($1, $2, $3, $4, $5) RETURNING *',
                 [title, content, imageUrl, userId, authorUsername]
             );
-            res.status(201).json(result.rows[0]);
+            const newPost = postResult.rows[0];
+
+            // [태그 기능] 태그 처리 로직
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                for (const tagName of tags) {
+                    const cleanedTagName = tagName.trim().toLowerCase();
+                    if(cleanedTagName === '') continue;
+
+                    let tagResult = await client.query('SELECT id FROM tags WHERE name = $1', [cleanedTagName]);
+                    let tagId;
+
+                    if (tagResult.rows.length > 0) {
+                        tagId = tagResult.rows[0].id;
+                    } else {
+                        const newTagResult = await client.query('INSERT INTO tags (name) VALUES ($1) RETURNING id', [cleanedTagName]);
+                        tagId = newTagResult.rows[0].id;
+                    }
+                    await client.query('INSERT INTO post_tags ("postId", "tagId") VALUES ($1, $2) ON CONFLICT DO NOTHING', [newPost.id, tagId]);
+                }
+            }
+
+            await client.query('COMMIT');
+            res.status(201).json(newPost);
+
         } catch (error) {
+            await client.query('ROLLBACK');
             console.error('게시글 작성 에러:', error);
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        } finally {
+            client.release();
         }
     });
 
-    // 5. 게시글 수정 API
+    // 5. 게시글 수정 API ([태그 기능] 태그 수정 로직 추가)
     router.put('/:id', authMiddleware, async (req, res) => {
         const { id } = req.params;
-        const { title, content } = req.body;
+        // [태그 기능] tags를 req.body에서 받아옵니다.
+        const { title, content, imageUrl, tags } = req.body;
         const currentUserId = req.user.id;
 
         if (!title || !content) {
             return res.status(400).json({ message: '제목과 내용은 필수입니다.' });
         }
 
+        const client = await pool.connect();
         try {
-            const postResult = await pool.query('SELECT "userId" FROM posts WHERE id = $1', [id]);
+            await client.query('BEGIN');
+            
+            const postResult = await client.query('SELECT "userId" FROM posts WHERE id = $1', [id]);
             if (postResult.rows.length === 0) {
+                throw new Error('404');
+            }
+            if (postResult.rows[0].userId !== currentUserId) {
+                throw new Error('403');
+            }
+
+            const updateResult = await client.query(
+                'UPDATE posts SET title = $1, content = $2, "imageUrl" = $3 WHERE id = $4 RETURNING *',
+                [title, content, imageUrl, id]
+            );
+
+            // [태그 기능] 기존 태그 연결을 모두 삭제합니다.
+            await client.query('DELETE FROM post_tags WHERE "postId" = $1', [id]);
+            
+            // [태그 기능] 새로운 태그들을 다시 연결합니다.
+            if (tags && Array.isArray(tags) && tags.length > 0) {
+                for (const tagName of tags) {
+                    const cleanedTagName = tagName.trim().toLowerCase();
+                    if(cleanedTagName === '') continue;
+
+                    let tagResult = await client.query('SELECT id FROM tags WHERE name = $1', [cleanedTagName]);
+                    let tagId;
+
+                    if (tagResult.rows.length > 0) {
+                        tagId = tagResult.rows[0].id;
+                    } else {
+                        const newTagResult = await client.query('INSERT INTO tags (name) VALUES ($1) RETURNING id', [cleanedTagName]);
+                        tagId = newTagResult.rows[0].id;
+                    }
+                    await client.query('INSERT INTO post_tags ("postId", "tagId") VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, tagId]);
+                }
+            }
+
+            await client.query('COMMIT');
+            res.status(200).json(updateResult.rows[0]);
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            if (error.message === '404') {
                 return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
             }
-
-            const post = postResult.rows[0];
-            if (post.userId !== currentUserId) {
+            if (error.message === '403') {
                 return res.status(403).json({ message: '이 게시글을 수정할 권한이 없습니다.' });
             }
-
-            const updateResult = await pool.query(
-                'UPDATE posts SET title = $1, content = $2 WHERE id = $3 RETURNING *',
-                [title, content, id]
-            );
-            res.status(200).json(updateResult.rows[0]);
-        } catch (error) {
             console.error('게시글 수정 에러:', error);
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        } finally {
+            client.release();
         }
     });
 
@@ -131,11 +236,10 @@ module.exports = (pool) => {
                 return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
             }
 
-            const post = postResult.rows[0];
-            if (post.userId !== currentUserId) {
+            if (postResult.rows[0].userId !== currentUserId) {
                 return res.status(403).json({ message: '이 게시글을 삭제할 권한이 없습니다.' });
             }
-
+            // post_tags와 posts 테이블에서 관련 데이터가 ON DELETE CASCADE 옵션에 의해 자동으로 삭제됩니다.
             await pool.query('DELETE FROM posts WHERE id = $1', [id]);
             res.status(200).json({ message: '게시글이 성공적으로 삭제되었습니다.' });
         } catch (error) {

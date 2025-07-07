@@ -61,6 +61,26 @@ const initializeDatabase = async () => {
                 FOREIGN KEY ("postId") REFERENCES posts (id) ON DELETE CASCADE
             );
         `);
+
+         // [태그 기능] 'tags' 테이블 생성 (모든 태그 이름을 저장)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS tags (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) UNIQUE NOT NULL
+            );
+        `);
+
+        // [태그 기능] 'post_tags' 조인 테이블 생성 (게시글과 태그를 연결)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS post_tags (
+                "postId" INTEGER NOT NULL,
+                "tagId" INTEGER NOT NULL,
+                PRIMARY KEY ("postId", "tagId"),
+                FOREIGN KEY ("postId") REFERENCES posts (id) ON DELETE CASCADE,
+                FOREIGN KEY ("tagId") REFERENCES tags (id) ON DELETE CASCADE
+            );
+        `);
+
         console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 확인 및 수정되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
@@ -90,6 +110,8 @@ const commentsRoutes = require('./routes/comments');
 const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
+const tagsRoutes = require('./routes/tags'); // 나중에 추가할 태그 라우트 파일
+
 
 // [수정] searchRoutes도 데이터베이스(pool)를 사용하므로 pool을 전달해야 합니다.
 app.use('/api/users', usersRoutes(pool));
@@ -98,6 +120,7 @@ app.use('/api/comments', commentsRoutes(pool));
 app.use('/api/search', searchRoutes(pool)); // <--- 여기가 수정된 부분입니다.
 app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
+ app.use('/api/tags', tagsRoutes(pool)); // 나중에 추가할 태그 라우트
 
 // --- 서버 시작 ---
 app.listen(port, () => {

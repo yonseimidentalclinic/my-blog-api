@@ -84,7 +84,8 @@ const initializeDatabase = async () => {
 initializeDatabase().catch(err => console.error('초기화 프로세스 에러:', err));
 
 const corsOptions = {
-  origin: [process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app', 'http://localhost:5173''http://127.0.0.1:5173'],
+  origin: [process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app', 'http://localhost:5173','http://127.0.0.1:5173'],
+
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204

@@ -130,9 +130,8 @@ module.exports = (pool) => {
         }
     });
 
-    // [핵심 수정] 6. 좋아요/좋아요 취소 API
+    // [최종 수정] 6. 좋아요/좋아요 취소 API
     router.post('/:id/like', authMiddleware, async (req, res) => {
-        // [수정] ID를 안전하게 숫자로 변환합니다.
         const postId = parseInt(req.params.id, 10);
         if (isNaN(postId)) {
             return res.status(400).json({ message: '유효하지 않은 게시글 ID입니다.' });
@@ -143,25 +142,38 @@ module.exports = (pool) => {
         try {
             await client.query('BEGIN');
 
+            // 1. 게시글이 존재하는지, 현재 좋아요 수는 몇 개인지 먼저 확인합니다.
+            const postResult = await client.query('SELECT "likeCount" FROM posts WHERE id = $1', [postId]);
+            if (postResult.rows.length === 0) {
+                throw new Error('게시글을 찾을 수 없습니다.');
+            }
+            // likeCount가 NULL이면 0으로 처리하여 안정성을 높입니다.
+            let currentLikeCount = postResult.rows[0].likeCount || 0;
+
+            // 2. 사용자가 이미 좋아요를 눌렀는지 확인합니다.
             const likeResult = await client.query('SELECT * FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
 
             if (likeResult.rows.length > 0) {
+                // 이미 좋아요를 눌렀으면 -> 좋아요 취소
                 await client.query('DELETE FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
-                await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) - 1 WHERE id = $1', [postId]);
-                await client.query('COMMIT');
-                res.status(200).json({ message: '좋아요를 취소했습니다.' });
+                // 현재 좋아요 수에서 1을 뺀 값으로 업데이트합니다.
+                await client.query('UPDATE posts SET "likeCount" = $1 WHERE id = $2', [currentLikeCount - 1, postId]);
             } else {
+                // 좋아요를 누르지 않았으면 -> 좋아요 추가
                 await client.query('INSERT INTO likes ("userId", "postId") VALUES ($1, $2)', [userId, postId]);
-                await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) + 1 WHERE id = $1', [postId]);
-                await client.query('COMMIT');
-                res.status(200).json({ message: '좋아요를 눌렀습니다.' });
+                // 현재 좋아요 수에서 1을 더한 값으로 업데이트합니다.
+                await client.query('UPDATE posts SET "likeCount" = $1 WHERE id = $2', [currentLikeCount + 1, postId]);
             }
+
+            await client.query('COMMIT'); // 모든 작업이 성공하면 최종 저장
+            res.status(200).json({ message: '좋아요 상태가 변경되었습니다.' });
+
         } catch (error) {
-            await client.query('ROLLBACK');
+            await client.query('ROLLBACK'); // 하나라도 실패하면 모든 작업을 되돌립니다.
             console.error('좋아요 API 에러:', error);
-            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+            res.status(500).json({ message: '서버 에러가 발생했습니다.', error: error.message });
         } finally {
-            client.release();
+            client.release(); // 데이터베이스 연결을 반환합니다.
         }
     });
 

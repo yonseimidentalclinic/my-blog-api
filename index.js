@@ -210,10 +210,10 @@ app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
         const likeResult = await client.query('SELECT * FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
         if (likeResult.rows.length > 0) {
             await client.query('DELETE FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
-            await client.query('UPDATE posts SET "likeCount" = "likeCount" - 1 WHERE id = $1', [postId]);
+            await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) - 1 WHERE id = $1', [postId]);
         } else {
             await client.query('INSERT INTO likes ("userId", "postId") VALUES ($1, $2)', [userId, postId]);
-            await client.query('UPDATE posts SET "likeCount" = "likeCount" + 1 WHERE id = $1', [postId]);
+            await client.query('UPDATE posts SET "likeCount" = COALESCE("likeCount", 0) + 1 WHERE id = $1', [postId]);
         }
         await client.query('COMMIT');
         res.status(200).json({ message: '좋아요 상태가 변경되었습니다.' });

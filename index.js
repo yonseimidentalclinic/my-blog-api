@@ -1,4 +1,4 @@
-// index.js (완전 통합 버전)
+// index.js (수정 및 개선 버전)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -8,8 +8,16 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
 
+// --- 필수 환경 변수 확인 ---
+// DATABASE_URL이나 JWT_SECRET이 .env 파일에 없으면 서버가 시작되지 않도록 하여 실수를 방지합니다.
+if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
+    console.error("치명적 에러: DATABASE_URL과 JWT_SECRET 환경 변수가 .env 파일에 설정되어야 합니다.");
+    process.exit(1);
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -73,29 +81,33 @@ const initializeDatabase = async () => {
         console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 확인 및 수정되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
+        // 초기화 실패 시 프로세스를 종료하여 더 큰 문제를 방지
+        process.exit(1);
     } finally {
         client.release();
     }
 };
 
-initializeDatabase().catch(err => console.error('초기화 프로세스 에러:', err));
+initializeDatabase();
 
-// CORS 설정
+// --- CORS 설정 수정 ---
 const corsOptions = {
   origin: [process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app', 'http://localhost:5173', 'http://127.0.0.1:5173'],
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  // [수정] methods를 문자열에서 '문자열 배열'로 변경하여 안정성을 높입니다.
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
   credentials: true,
   optionsSuccessStatus: 204
 };
+
+// [수정] app.use(cors(corsOptions))가 모든 경로에 대한 pre-flight(OPTIONS) 요청을 처리하므로,
+// app.options('*', ...) 라인은 보통 필요하지 않으며 때로 문제를 일으킬 수 있어 제거합니다.
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // 기본 미들웨어
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- 인증 미들웨어 ---
-const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-and-secure';
 function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -112,6 +124,7 @@ function authMiddleware(req, res, next) {
 }
 
 // --- API 라우터 ---
+// (라우터 코드는 변경되지 않았습니다)
 
 // 사용자 (Users) API
 app.post('/api/users/register', async (req, res) => {
@@ -272,6 +285,14 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: '이미지 파일이 필요합니다.' });
     res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` });
 });
+
+// --- 중앙 집중식 오류 처리 미들웨어 ---
+// 예상치 못한 모든 에러는 여기서 처리됩니다.
+app.use((err, req, res, next) => {
+    console.error("예상치 못한 에러 발생:", err.stack);
+    res.status(500).json({ message: '서버 내부에서 오류가 발생했습니다.' });
+});
+
 
 // 서버 시작
 app.listen(port, () => {

@@ -171,5 +171,25 @@ module.exports = (pool) => {
         }
     });
 
+    // [추가] 7. 특정 게시글에 '좋아요' 누른 사용자 목록 조회 API
+    router.get('/:postId/likers', async (req, res) => {
+        const { postId } = req.params;
+        try {
+            const result = await pool.query(
+                `SELECT u.username FROM users u
+                 JOIN likes l ON u.id = l."userId"
+                 WHERE l."postId" = $1`,
+                [postId]
+            );
+            res.status(200).json(result.rows);
+        } catch (error) {
+            console.error('좋아요 누른 사용자 목록 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
+
+
+
     return router;
 };

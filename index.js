@@ -1,4 +1,4 @@
-// index.js (오류 수정 후)
+// index.js (라우트 오류 수정 후)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -102,14 +102,14 @@ const commentsRoutes = require('./routes/comments');
 const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
-const authMiddleware = require('./authMiddleware'); // authMiddleware 추가
 
 // API 라우트를 설정합니다.
 app.use('/api/users', usersRoutes(pool));
-app.use('/api/posts', postsRoutes(pool)); // postsRoutes가 모든 관련 로직을 처리합니다.
-app.use('/api/comments', commentsRoutes(pool, authMiddleware));
+app.use('/api/posts', postsRoutes(pool));
+// [수정] 각 라우트 파일이 필요한 의존성을 내부에서 직접 require 하도록 수정합니다.
+app.use('/api/comments', commentsRoutes(pool));
 app.use('/api/search', searchRoutes(pool));
-app.use('/api/likes', likesRoutes(pool, authMiddleware));
+app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
 
 app.listen(port, () => {

@@ -133,6 +133,44 @@ module.exports = (pool) => {
         }
     });
 
+         // [추가] 6. 좋아요/좋아요 취소 API (인증 필요)
+    router.post('/:id/like', authMiddleware, async (req, res) => {
+        const postId = req.params.id;
+        const userId = req.user.id;
+        const client = await pool.connect(); // 트랜잭션을 위해 클라이언트 연결
+
+        try {
+            await client.query('BEGIN'); // 트랜잭션 시작
+
+            // 1. 이미 좋아요를 눌렀는지 확인
+            const likeResult = await client.query('SELECT * FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
+
+            if (likeResult.rows.length > 0) {
+                // 이미 좋아요를 눌렀으면 -> 좋아요 취소
+                await client.query('DELETE FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
+                await client.query('UPDATE posts SET "likeCount" = "likeCount" - 1 WHERE id = $1', [postId]);
+                await client.query('COMMIT'); // 트랜잭션 완료
+                res.status(200).json({ message: '좋아요를 취소했습니다.' });
+            } else {
+                // 좋아요를 누르지 않았으면 -> 좋아요 추가
+                await client.query('INSERT INTO likes ("userId", "postId") VALUES ($1, $2)', [userId, postId]);
+                await client.query('UPDATE posts SET "likeCount" = "likeCount" + 1 WHERE id = $1', [postId]);
+                await client.query('COMMIT'); // 트랜잭션 완료
+                res.status(200).json({ message: '좋아요를 눌렀습니다.' });
+            }
+        } catch (error) {
+            await client.query('ROLLBACK'); // 에러 발생 시 트랜잭션 되돌리기
+            console.error('좋아요 API 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        } finally {
+            client.release(); // 클라이언트 연결 반환
+        }
+    });
+
+     
+
     return router;
 };
+
+  
 

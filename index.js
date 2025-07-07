@@ -1,4 +1,4 @@
-// index.js (통합 버전)
+// index.js (완전 통합 버전)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -94,7 +94,7 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// --- 인증 미들웨어 (authMiddleware.js 내용 통합) ---
+// --- 인증 미들웨어 ---
 const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-and-secure';
 function authMiddleware(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -111,7 +111,7 @@ function authMiddleware(req, res, next) {
     }
 }
 
-// --- 라우터 설정 (모든 routes/*.js 내용 통합) ---
+// --- API 라우터 ---
 
 // 사용자 (Users) API
 app.post('/api/users/register', async (req, res) => {
@@ -123,7 +123,7 @@ app.post('/api/users/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUserResult = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username', [username, hashedPassword]);
         res.status(201).json({ id: newUserResult.rows[0].id, username: newUserResult.rows[0].username, message: '회원가입이 성공적으로 완료되었습니다.' });
-    } catch (error) { res.status(500).json({ message: '서버 에러' }); }
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
 });
 app.post('/api/users/login', async (req, res) => {
     const { username, password } = req.body;
@@ -136,7 +136,7 @@ app.post('/api/users/login', async (req, res) => {
         if (!isPasswordValid) return res.status(401).json({ message: '아이디 또는 비밀번호가 잘못되었습니다.' });
         const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
         res.status(200).json({ message: '로그인 성공!', token: token });
-    } catch (error) { res.status(500).json({ message: '서버 에러' }); }
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
 });
 app.get('/api/users/:userId/posts', async (req, res) => {
     const { userId } = req.params;
@@ -145,7 +145,7 @@ app.get('/api/users/:userId/posts', async (req, res) => {
         if (userResult.rows.length === 0) return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
         const postsResult = await pool.query('SELECT * FROM posts WHERE "userId" = $1 ORDER BY "createdAt" DESC', [userId]);
         res.status(200).json({ username: userResult.rows[0].username, posts: postsResult.rows });
-    } catch (error) { res.status(500).json({ message: '서버 에러' }); }
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
 });
 
 // 게시글 (Posts) API
@@ -159,24 +159,103 @@ app.get('/api/posts', async (req, res) => {
         const [postsResult, totalResult] = await Promise.all([postsResultPromise, totalResultPromise]);
         const totalPosts = parseInt(totalResult.rows[0].count, 10);
         res.status(200).json({ posts: postsResult.rows, totalPages: Math.ceil(totalPosts / limit), currentPage: page, totalPosts: totalPosts });
-    } catch (error) { res.status(500).json({ message: '서버 에러' }); }
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
 });
-app.get('/api/posts/:id', async (req, res) => { /* ... */ });
-app.post('/api/posts', authMiddleware, async (req, res) => { /* ... */ });
-app.put('/api/posts/:id', authMiddleware, async (req, res) => { /* ... */ });
-app.delete('/api/posts/:id', authMiddleware, async (req, res) => { /* ... */ });
-app.post('/api/posts/:id/like', authMiddleware, async (req, res) => { /* ... */ });
+app.post('/api/posts', authMiddleware, async (req, res) => {
+    const { title, content, imageUrl } = req.body;
+    try {
+        const result = await pool.query(
+            'INSERT INTO posts (title, content, "imageUrl", "userId", "authorUsername") VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [title, content, imageUrl, req.user.id, req.user.username]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
+app.put('/api/posts/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { title, content } = req.body;
+    try {
+        const postResult = await pool.query('SELECT "userId" FROM posts WHERE id = $1', [id]);
+        if (postResult.rows.length === 0) return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
+        if (postResult.rows[0].userId !== req.user.id) return res.status(403).json({ message: '수정 권한이 없습니다.' });
+        const updateResult = await pool.query('UPDATE posts SET title = $1, content = $2 WHERE id = $3 RETURNING *', [title, content, id]);
+        res.status(200).json(updateResult.rows[0]);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
+app.delete('/api/posts/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const postResult = await pool.query('SELECT "userId" FROM posts WHERE id = $1', [id]);
+        if (postResult.rows.length === 0) return res.status(404).json({ message: '게시글을 찾을 수 없습니다.' });
+        if (postResult.rows[0].userId !== req.user.id) return res.status(403).json({ message: '삭제 권한이 없습니다.' });
+        await pool.query('DELETE FROM posts WHERE id = $1', [id]);
+        res.status(200).json({ message: '게시글이 삭제되었습니다.' });
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
+app.post('/api/posts/:id/like', authMiddleware, async (req, res) => {
+    const postId = parseInt(req.params.id, 10);
+    if (isNaN(postId)) return res.status(400).json({ message: '유효하지 않은 게시글 ID입니다.' });
+    const userId = req.user.id;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const likeResult = await client.query('SELECT * FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
+        if (likeResult.rows.length > 0) {
+            await client.query('DELETE FROM likes WHERE "userId" = $1 AND "postId" = $2', [userId, postId]);
+            await client.query('UPDATE posts SET "likeCount" = "likeCount" - 1 WHERE id = $1', [postId]);
+        } else {
+            await client.query('INSERT INTO likes ("userId", "postId") VALUES ($1, $2)', [userId, postId]);
+            await client.query('UPDATE posts SET "likeCount" = "likeCount" + 1 WHERE id = $1', [postId]);
+        }
+        await client.query('COMMIT');
+        res.status(200).json({ message: '좋아요 상태가 변경되었습니다.' });
+    } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ message: '서버 에러' }); } finally { client.release(); }
+});
 
 // 댓글 (Comments) API
-app.get('/api/comments', async (req, res) => { /* ... */ });
-app.post('/api/comments', authMiddleware, async (req, res) => { /* ... */ });
-app.delete('/api/comments/:id', authMiddleware, async (req, res) => { /* ... */ });
+app.get('/api/comments', async (req, res) => {
+    const { postId } = req.query;
+    if (!postId) return res.status(400).json({ message: 'postId가 필요합니다.' });
+    try {
+        const result = await pool.query('SELECT * FROM comments WHERE "postId" = $1 ORDER BY "createdAt" ASC', [postId]);
+        res.status(200).json(result.rows);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
+app.post('/api/comments', authMiddleware, async (req, res) => {
+    const { content, postId } = req.body;
+    try {
+        const result = await pool.query('INSERT INTO comments (content, "postId", "userId", "authorUsername") VALUES ($1, $2, $3, $4) RETURNING *', [content, postId, req.user.id, req.user.username]);
+        res.status(201).json(result.rows[0]);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
+app.delete('/api/comments/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const commentResult = await pool.query('SELECT "userId" FROM comments WHERE id = $1', [id]);
+        if (commentResult.rows.length === 0) return res.status(404).json({ message: '댓글을 찾을 수 없습니다.' });
+        if (commentResult.rows[0].userId !== req.user.id) return res.status(403).json({ message: '삭제 권한이 없습니다.' });
+        await pool.query('DELETE FROM comments WHERE id = $1', [id]);
+        res.status(200).json({ message: '댓글이 삭제되었습니다.' });
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
 
 // 좋아요 (Likes) API
-app.get('/api/likes', authMiddleware, async (req, res) => { /* ... */ });
+app.get('/api/likes', authMiddleware, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT "postId" FROM likes WHERE "userId" = $1', [req.user.id]);
+        res.status(200).json(result.rows.map(row => row.postId));
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
 
 // 검색 (Search) API
-app.get('/api/search', async (req, res) => { /* ... */ });
+app.get('/api/search', async (req, res) => {
+    const { term } = req.query;
+    if (!term) return res.status(200).json([]);
+    try {
+        const result = await pool.query('SELECT * FROM posts WHERE title ILIKE $1 ORDER BY "createdAt" DESC', [`%${term}%`]);
+        res.status(200).json(result.rows);
+    } catch (error) { console.error(error); res.status(500).json({ message: '서버 에러' }); }
+});
 
 // 이미지 업로드 (Upload) API
 const storage = multer.diskStorage({ destination: (req, file, cb) => cb(null, 'uploads/'), filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`) });
@@ -185,7 +264,6 @@ app.post('/api/upload', authMiddleware, upload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: '이미지 파일이 필요합니다.' });
     res.status(201).json({ imageUrl: `/uploads/${req.file.filename}` });
 });
-
 
 // 서버 시작
 app.listen(port, () => {

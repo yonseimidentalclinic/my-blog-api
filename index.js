@@ -1,4 +1,4 @@
-// index.js (모든 기능 최종 복구)
+// index.js (CORS 오류 최종 해결)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -84,14 +84,21 @@ const initializeDatabase = async () => {
 };
 initializeDatabase().catch(err => console.error('초기화 프로세스 에러:', err));
 
+// [CORS 수정] 환경 변수 대신, 허용할 주소를 코드에 직접 명시합니다.
 const corsOptions = {
-  origin: [process.env.CORS_ORIGIN || 'https://my-blog-frontend-one.vercel.app', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: [
+      'https://my-blog-frontend-one.vercel.app', 
+      'http://localhost:5173', 
+      'http://127.0.0.1:5173'
+  ],
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   credentials: true,
   optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+
+
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

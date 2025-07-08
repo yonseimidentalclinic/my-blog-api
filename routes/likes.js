@@ -1,10 +1,10 @@
-// routes/likes.js
 
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../authMiddleware');
 
-module.exports = (pool) => {
+module.exports = (pool) => {// routes/likes.js
+
 
     // 현재 로그인한 사용자가 '좋아요' 누른 모든 게시글 ID 조회 API
     // GET /api/likes

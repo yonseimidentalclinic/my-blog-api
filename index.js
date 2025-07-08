@@ -111,7 +111,7 @@ app.use('/api/posts', postsRoutes(pool));
 app.use('/api/comments', commentsRoutes(pool));
 app.use('/api/search', searchRoutes(pool));
 app.use('/api/likes', likesRoutes(pool));
-app.use('/api/upload', uploadRoutes); // uploadRoutes는 pool이 필요 없습니다.
+app.use('/api/upload', uploadRoutes);
 
 
 app.listen(port, () => {

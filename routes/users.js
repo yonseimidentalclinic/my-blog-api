@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
+const authMiddleware = require('../authMiddleware'); // 인증 미들웨어 추가
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-and-secure';
 
@@ -97,6 +98,45 @@ module.exports = (pool) => {
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
         }
     });
+
+    // [추가] 비밀번호 변경 API
+    router.put('/change-password', authMiddleware, async (req, res) => {
+        const { id: userId } = req.user; // 토큰에서 사용자 ID를 가져옵니다.
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: '현재 비밀번호와 새 비밀번호를 모두 입력해야 합니다.' });
+        }
+
+        try {
+            // 1. 데이터베이스에서 현재 사용자의 정보를 가져옵니다.
+            const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+            const user = userResult.rows[0];
+
+            if (!user) {
+                return res.status(404).json({ message: '사용자 정보를 찾을 수 없습니다.' });
+            }
+
+            // 2. 입력된 현재 비밀번호가 맞는지 확인합니다.
+            const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+            if (!isPasswordValid) {
+                return res.status(401).json({ message: '현재 비밀번호가 일치하지 않습니다.' });
+            }
+
+            // 3. 새 비밀번호를 암호화합니다.
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+            // 4. 데이터베이스에 새 비밀번호를 업데이트합니다.
+            await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNewPassword, userId]);
+
+            res.status(200).json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
+
+        } catch (error) {
+            console.error('비밀번호 변경 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
 
     return router;
 };

@@ -1,4 +1,4 @@
-// routes/users.js (역할 정보 추가)
+// routes/users.js (비밀 관리자 지정 API)
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -8,7 +8,31 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-
 
 module.exports = (pool) => {
 
-    // 회원가입 API (이전과 동일)
+    // [추가] 특정 사용자를 관리자로 만드는 비밀 API (임시로 사용 후 반드시 삭제해야 합니다!)
+    router.get('/make-admin-secret-route/:username', async (req, res) => {
+        const { username } = req.params;
+        try {
+            const result = await pool.query(
+                "UPDATE users SET role = 'admin' WHERE username = $1 RETURNING *",
+                [username]
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).send('해당 사용자를 찾을 수 없습니다.');
+            }
+
+            res.status(200).send(`${result.rows[0].username} 님이 성공적으로 관리자가 되었습니다.`);
+
+        } catch (error) {
+            console.error('관리자 지정 에러:', error);
+            res.status(500).send('서버 에러가 발생했습니다.');
+        }
+    });
+
+
+    // --- 기존 코드들 ---
+    
+    // 회원가입 API
     router.post('/register', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) {
@@ -36,51 +60,43 @@ module.exports = (pool) => {
         }
     });
 
-    // 로그인 API (역할 정보 추가)
+    // 로그인 API
     router.post('/login', async (req, res) => {
         const { username, password } = req.body;
         if (!username || !password) {
             return res.status(400).json({ message: '아이디와 비밀번호는 필수입니다.' });
         }
         try {
-            // [수정] role 컬럼도 함께 조회합니다.
             const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
             const user = result.rows[0];
-
             if (!user) {
                 return res.status(401).json({ message: '아이디 또는 비밀번호가 잘못되었습니다.' });
             }
-
             const isPasswordValid = await bcrypt.compare(password, user.password);
             if (!isPasswordValid) {
                 return res.status(401).json({ message: '아이디 또는 비밀번호가 잘못되었습니다.' });
             }
-
-            // [수정] JWT 토큰에 role 정보를 포함하여 서명합니다.
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
                 JWT_SECRET,
                 { expiresIn: '1h' }
             );
-
             res.status(200).json({
                 message: '로그인 성공!',
                 token: token,
-                // [수정] 응답 객체에 user의 role 정보도 담아서 보냅니다.
                 user: {
                     id: user.id,
                     username: user.username,
                     role: user.role 
                 }
             });
-
         } catch (error) {
             console.error('로그인 에러:', error);
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
         }
     });
 
-    // 특정 사용자가 작성한 모든 게시글 조회 API (이전과 동일)
+    // 특정 사용자 게시글 조회 API
     router.get('/:userId/posts', async (req, res) => {
         const { userId } = req.params;
         try {

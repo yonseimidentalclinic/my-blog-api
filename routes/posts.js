@@ -3,6 +3,32 @@ const router = express.Router();
 const authMiddleware = require('../authMiddleware'); 
 
 module.exports = (pool) => {
+
+     // [추가] '공지' 태그가 달린 최신 5개 게시글을 가져오는 API
+    router.get('/notices', async (req, res) => {
+        try {
+            const result = await pool.query(
+                `SELECT p.id, p.title 
+                 FROM posts p
+                 JOIN post_tags pt ON p.id = pt."postId"
+                 JOIN tags t ON pt."tagId" = t.id
+                 WHERE t.name = '공지'
+                 ORDER BY p."createdAt" DESC
+                 LIMIT 5`
+            );
+            res.status(200).json(result.rows);
+        } catch (error) {
+            console.error('공지사항 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
+
+
+
+
+
+
     router.get('/tagged/:tagName', async (req, res) => {
         const { tagName } = req.params;
         try {

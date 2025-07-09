@@ -8,27 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-
 
 module.exports = (pool) => {
 
-    // [추가] 특정 사용자를 관리자로 만드는 비밀 API (임시로 사용 후 반드시 삭제해야 합니다!)
-    router.get('/make-admin-secret-route/:username', async (req, res) => {
-        const { username } = req.params;
-        try {
-            const result = await pool.query(
-                "UPDATE users SET role = 'admin' WHERE username = $1 RETURNING *",
-                [username]
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(404).send('해당 사용자를 찾을 수 없습니다.');
-            }
-
-            res.status(200).send(`${result.rows[0].username} 님이 성공적으로 관리자가 되었습니다.`);
-
-        } catch (error) {
-            console.error('관리자 지정 에러:', error);
-            res.status(500).send('서버 에러가 발생했습니다.');
-        }
-    });
-
+    
 
     // --- 기존 코드들 ---
     

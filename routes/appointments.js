@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../authMiddleware'); // 관리자 인증을 위해 사용
+const adminMiddleware = require('../adminMiddleware'); // [추가] 관리자 확인 미들웨어
 
 module.exports = (pool) => {
 
@@ -38,9 +39,11 @@ module.exports = (pool) => {
 
     /**
      * GET /api/appointments
-     * 모든 예약 목록을 조회합니다. (관리자용, 인증 필요)
+     * 모든 예약 목록 조회 (관리자용, 인증 + 관리자 권한 필요)
      */
-    router.get('/', authMiddleware, async (req, res) => {
+    // [수정] authMiddleware 다음에 adminMiddleware를 추가하여 이중으로 확인합니다.
+
+    router.get('/', authMiddleware,adminMiddleware, async (req, res) => {
         try {
             const allAppointments = await pool.query(
                 'SELECT * FROM appointments ORDER BY appointment_date DESC, appointment_time DESC'

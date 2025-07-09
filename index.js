@@ -75,6 +75,19 @@ const initializeDatabase = async () => {
                 FOREIGN KEY ("tagId") REFERENCES tags (id) ON DELETE CASCADE
             );
         `);
+
+         await client.query(`
+            CREATE TABLE IF NOT EXISTS appointments (
+                id SERIAL PRIMARY KEY,
+                patient_name VARCHAR(255) NOT NULL,
+                patient_contact VARCHAR(255) NOT NULL,
+                appointment_date DATE NOT NULL,
+                appointment_time TIME NOT NULL,
+                notes TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 확인 및 수정되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
@@ -114,6 +127,7 @@ const commentsRoutes = require('./routes/comments');
 const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
+const appointmentsRoutes = require('./routes/appointments');
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
@@ -121,6 +135,8 @@ app.use('/api/comments', commentsRoutes(pool));
 app.use('/api/search', searchRoutes(pool));
 app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
+app.use('/api/appointments', appointmentsRoutes(pool));
+
 
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);

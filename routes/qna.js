@@ -49,6 +49,24 @@ module.exports = (pool) => {
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
         }
     });
+    /**
+     * [추가] GET /api/qna/public
+     * 공개된 문의/답변 목록만 조회합니다. (누구나 접근 가능)
+     */
+    router.get('/public', async (req, res) => {
+        try {
+            const publicQna = await pool.query(
+                `SELECT id, patient_name, title, question_body, answer_body, questioned_at, answered_at 
+                 FROM qna 
+                 WHERE is_private = false AND answer_body IS NOT NULL
+                 ORDER BY questioned_at DESC`
+            );
+            res.status(200).json(publicQna.rows);
+        } catch (error) {
+            console.error('공개 Q&A 목록 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
 
     /**
      * PUT /api/qna/:id/answer

@@ -96,6 +96,22 @@ const initializeDatabase = async () => {
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         `);
+
+         // [추가] 온라인 상담/문의 내용을 저장할 qna 테이블 생성
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS qna (
+                id SERIAL PRIMARY KEY,
+                patient_name VARCHAR(100) NOT NULL,
+                patient_contact VARCHAR(100),
+                title VARCHAR(255) NOT NULL,
+                question_body TEXT NOT NULL,
+                answer_body TEXT,
+                is_private BOOLEAN DEFAULT true,
+                questioned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                answered_at TIMESTAMP WITH TIME ZONE
+            );
+        `);
+
         console.log('PostgreSQL 데이터베이스 테이블들이 성공적으로 확인 및 수정되었습니다.');
     } catch (err) {
         console.error('데이터베이스 초기화 실패:', err.message);
@@ -130,6 +146,8 @@ const searchRoutes = require('./routes/search');
 const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
 const appointmentsRoutes = require('./routes/appointments');
+// 나중에 추가할 Q&A 라우트 파일
+// const qnaRoutes = require('./routes/qna');
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
@@ -138,6 +156,8 @@ app.use('/api/search', searchRoutes(pool));
 app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/appointments', appointmentsRoutes(pool));
+// app.use('/api/qna', qnaRoutes(pool));
+
 
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);

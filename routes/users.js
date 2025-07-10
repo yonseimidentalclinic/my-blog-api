@@ -4,6 +4,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const authMiddleware = require('../authMiddleware'); // 인증 미들웨어 추가
+const adminMiddleware = require('../adminMiddleware'); // 관리자 확인 미들웨어
+
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-very-secret-key-that-is-long-and-secure';
 
@@ -136,6 +138,51 @@ module.exports = (pool) => {
             res.status(500).json({ message: '서버 에러가 발생했습니다.' });
         }
     });
+
+     // --- [추가] 관리자 전용 API ---
+
+    /**
+     * GET /api/users
+     * 모든 사용자 목록을 조회합니다. (관리자용)
+     */
+    router.get('/', authMiddleware, adminMiddleware, async (req, res) => {
+        try {
+            // 비밀번호를 제외한 사용자 정보를 가져옵니다.
+            const result = await pool.query('SELECT id, username, role FROM users ORDER BY id ASC');
+            res.status(200).json(result.rows);
+        } catch (error) {
+            console.error('사용자 목록 조회 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
+    /**
+     * PUT /api/users/:userId/reset-password
+     * 특정 사용자의 비밀번호를 초기화합니다. (관리자용)
+     */
+    router.put('/:userId/reset-password', authMiddleware, adminMiddleware, async (req, res) => {
+        const { userId } = req.params;
+        const defaultPassword = '123456'; // 임시 비밀번호
+
+        try {
+            const hashedDefaultPassword = await bcrypt.hash(defaultPassword, 10);
+            const result = await pool.query(
+                'UPDATE users SET password = $1 WHERE id = $2 RETURNING username',
+                [hashedDefaultPassword, userId]
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: '해당 사용자를 찾을 수 없습니다.' });
+            }
+
+            res.status(200).json({ message: `${result.rows[0].username} 님의 비밀번호가 성공적으로 초기화되었습니다.` });
+
+        } catch (error) {
+            console.error('비밀번호 초기화 에러:', error);
+            res.status(500).json({ message: '서버 에러가 발생했습니다.' });
+        }
+    });
+
 
 
     return router;

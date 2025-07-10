@@ -147,7 +147,7 @@ const likesRoutes = require('./routes/likes');
 const uploadRoutes = require('./routes/upload');
 const appointmentsRoutes = require('./routes/appointments');
 // 나중에 추가할 Q&A 라우트 파일
-// const qnaRoutes = require('./routes/qna');
+const qnaRoutes = require('./routes/qna');
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
@@ -156,7 +156,7 @@ app.use('/api/search', searchRoutes(pool));
 app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/appointments', appointmentsRoutes(pool));
-// app.use('/api/qna', qnaRoutes(pool));
+app.use('/api/qna', qnaRoutes(pool));
 
 
 app.listen(port, () => {

@@ -148,6 +148,7 @@ const uploadRoutes = require('./routes/upload');
 const appointmentsRoutes = require('./routes/appointments');
 // 나중에 추가할 Q&A 라우트 파일
 const qnaRoutes = require('./routes/qna');
+const dashboardRoutes = require('./routes/dashboard'); // [추가]
 
 app.use('/api/users', usersRoutes(pool));
 app.use('/api/posts', postsRoutes(pool));
@@ -157,7 +158,7 @@ app.use('/api/likes', likesRoutes(pool));
 app.use('/api/upload', uploadRoutes);
 app.use('/api/appointments', appointmentsRoutes(pool));
 app.use('/api/qna', qnaRoutes(pool));
-
+app.use('/api/dashboard', dashboardRoutes(pool)); // [추가]
 
 app.listen(port, () => {
     console.log(`서버가 http://localhost:${port} 에서 실행 중입니다.`);
